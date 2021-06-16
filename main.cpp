@@ -1,170 +1,192 @@
 #include <iostream>
- 
-//  remove_if, sort, min, max, reverse,  merge, binary_search, is_sorted, unique, replace_if, count, push_heap, pop_heap, make_heap
-#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <vector>
-// .push, .pop, .front, .back
-#include <queue>
-// .front, .back, .push_back, push_front, pop_back, pop_front, .at (slow)
-#include <deque>
-// map<string, int> m; m["x"] = 2; auto it = m.find("x"); it != m.end(); it->second; m.erase(it); m.erase("x");
-#include <map>
-// can take custom binary cmp function, 
-// set<string> a; a.insert("f"); set<string>iterator it = a.find("f); it != a.end(); *it; a.erase("f");
-#include <set> 
+#include <set>
 #include <cstdio> // printf, scanf // scanf("%d", &i); // read integer
 #include <stdlib.h>
 #include <unordered_map>
-#include <assert.h> // assert
-#include <utility> // pair, make_pair
-#include <functional>
-#include <string> 
-#include <stack> // .pop .push .size .top .empty
-#include <math.h> // cos, sin, tan, acos, asin, atan2, exp, log, log10, log2, pow, sqrt, hypot, cell, floor, round, fabs, abs
- 
+#include <utility>  // pair, make_pair
+
+
 using namespace std;
-#define speed ios_base::sync_with_stdio(0),cin.tie(0),cout.tie(0)
-#define ll long long int
-#define fo(i,n) for(int i=0;i<n;i++)
-#define fab(i,a,b) for(int i=a;i<b;i++)
-#define rfo(i,n) for(int i=n;i>0;i--)
- 
-//pair
-#define pii pair<int,int>
-#define F first
-#define S second
- 
-// vector
-#define vll vector<ll>
-#define pb(x) push_back(x)
- 
-using namespace std;
+#define speed ios_base::sync_with_stdio(0), cin.tie(0), cout.tie(0)
+
 
 const int MAX_WEIGHT_LIMIT = 4000000;
 
-
-
-
- 
-
-
-struct Transaction{
+struct Transaction
+{
     string id;
-    int weight ;
-    int fees ;
-    vector<string>parents;
+    int weight;
+    int fees;
+    vector<string> parents;
+
+    bool operator<(const Transaction &t) const
+    {
+        return this->id < t.id;
+    }
 };
 
-unordered_map<string,Transaction> transactions;
+unordered_map<string, Transaction> transactions;
+set<string> completed_transaction;
+multiset<pair<float, Transaction>, greater<pair<float, Transaction>>> all_transaction;
 
-
- 
-
-void read_csv(string filename){
-    // Reads a CSV file into a vector of <string, vector<int>> pairs where
-    // each pair represents <column name, column values>
-
-    // Create a vector of <string, int vector> pairs to store the result
-    vector<pair<string, vector<string>>> result;
-
+// reading and storing data from file
+void read_csv(string filename)
+{
     // Create an input filestream
     ifstream myFile(filename);
 
     // Make sure the file is open
-    if(!myFile.is_open()) throw runtime_error("Could not open file");
+    if (!myFile.is_open())
+        throw runtime_error("Could not open file");
 
     // Helper vars
-    string line, colname;
-    string val;
-    int first=1;
-    while(getline(myFile, line))
+    string line, val;
+    int first = 1;
+    while (getline(myFile, line))
     {
         // Create a stringstream of the current line
         stringstream ss(line);
-        
         // Keep track of the current column index
-        int colIdx = 0;
-        
         // Extract each integer
-        int index=0;
+        int index = 0;
         Transaction trans;
-        
-        // cout<<line<<endl;
-        while(getline(ss,val,',')){
-
-            if(first){
-                first=0;
+        while (getline(ss, val, ','))
+        {
+            if (first)
+            {
                 break;
             }
-            // cout<<index<<"-"<<val<<" ";
-           
-            if(index ==0){
+            if (index == 0)
+            {
                 trans.id = val;
-                
             }
-            else if(index == 1){
+            else if (index == 1)
+            {
                 trans.fees = stoi(val);
             }
-            else if(index == 2){
+            else if (index == 2)
+            {
                 trans.weight = stoi(val);
             }
-            else if(index == 3){
+            else if (index == 3)
+            {
                 string paren;
                 vector<string> parents;
-                if(val != ""){
+                if (val != "")
+                {
                     stringstream par_ss(val);
 
-                    while(getline(par_ss,paren,';')){
-                        parents.push_back (paren);
+                    while (getline(par_ss, paren, ';'))
+                    {
+                        parents.push_back(paren);
                     }
                 }
-
                 trans.parents = parents;
             }
 
-
             index++;
-            
-        
-            // if(ss.peek() == ',') ss.ignore();
-            
         }
-        // cout<<endl;
-        // cout<<trans.id<<" "<<trans.parents
+        if (first)
+        {
+            first = 0;
+            continue;
+        }
         transactions[trans.id] = trans;
-        
     }
 
-    // Close file
     myFile.close();
-
-    // return result;
 }
 
 
+void writeFile(string FileName, vector<string> final_transactions)
+{
+    ofstream myfile;
+    myfile.open(FileName);
+    for (auto id : final_transactions)
+    {
+        myfile << id << endl;
+    }
+}
 
-int main(){
-	speed;
-	
-	string file_name ;
+
+//Arranging Transaction according to fees/weight
+void parseData()
+{
+
+    for (auto trans : transactions)
+    {
+        all_transaction.insert(make_pair((trans.second.fees * 1.0) / trans.second.weight, trans.second));
+    }
+}
+
+//Function to check if current Transaction is safe to add or not
+bool isSafe(Transaction t, long long cur_weight)
+{
+    if (t.weight + cur_weight > MAX_WEIGHT_LIMIT)
+    {
+        return false;
+    }
+    for (auto parent : t.parents)
+    {
+        if (completed_transaction.find(parent) == completed_transaction.end())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void findTransactions(vector<string> &final_transactions, long long &cur_weight, long long &cur_fees)
+{
+    while (all_transaction.size())
+    {
+
+        bool check = 1;
+        auto element_removed = all_transaction.begin();
+        for (auto it = all_transaction.begin(); it != all_transaction.end(); it++)
+        {
+            pair<float, Transaction> t = *it;
+            if (isSafe(t.second, cur_weight))
+            {
+                final_transactions.push_back(t.second.id);
+                completed_transaction.insert(t.second.id);
+                cur_weight += t.second.weight;
+                cur_fees += t.second.fees;
+                check = 0;
+                all_transaction.erase(it);
+
+                break;
+            }
+        }
+        if (check)
+        {
+            break;
+        }
+    }
+}
+
+int main()
+{
+    speed;
+
+    string file_name;
     file_name = "mempool.csv";
 
     read_csv(file_name);
+    parseData();
 
+    long long cur_weight = 0;// variables to store weight and fees 
+    long long cur_fees = 0;
+    vector<string> final_transactions; // vector to store final list of transactions
 
-    for (auto a: transactions){
-        cout<<a.second.id<<" "<<a.second.weight<<" "<<a.second.fees<<endl;
-        for(auto e:a.second.parents){
-            cout<<e<< " ";
-        }
-        cout<<endl;
+    findTransactions(final_transactions, cur_weight, cur_fees);
 
-    }
-
+    cout << "Total Fees=> " << cur_fees << endl;
+    cout << "Total Weight=> " << cur_weight << endl;
+    writeFile("block.txt", final_transactions);
 
     return 0;
 }
- 
- 
